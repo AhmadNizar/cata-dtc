@@ -2,8 +2,7 @@
   "name": "Go + MySQL + Redis",
   "dockerComposeFile": "docker-compose.yml",
   "service": "dev",
-  "workspaceFolder": "/workspace",
-  "shutdownAction": "stopCompose",
+  "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
   "forwardPorts": [8080, 3306, 6379],
   "customizations": {
     "vscode": {
@@ -11,5 +10,6 @@
         "golang.go"
       ]
     }
-  }
+  },
+  "remoteUser": "root"
 }

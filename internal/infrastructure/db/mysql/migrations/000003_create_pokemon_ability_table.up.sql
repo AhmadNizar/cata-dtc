@@ -1,0 +1,10 @@
+CREATE TABLE pokemon_ability (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  pokemon_id INT NOT NULL,
+  ability_name VARCHAR(100) NOT NULL,
+  is_hidden BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (pokemon_id) REFERENCES pokemon(id) ON DELETE CASCADE,
+  INDEX idx_pokemon_ability_pokemon_id (pokemon_id)
+);
