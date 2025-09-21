@@ -53,11 +53,11 @@ func LoadConfig() *Config {
 			Env:     getEnv("APP_ENV", "development"),
 		},
 		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "mysql"),
-			Port:     getEnv("DB_PORT", "3306"),
-			User:     getEnv("DB_USER", "root"),
-			Password: getEnv("DB_PASSWORD", "password"),
-			Name:     getEnv("DB_NAME", "pokemon_db"),
+			Host:     getEnv("MYSQL_HOST", "mysql"),
+			Port:     getEnv("MYSQL_PORT", "3306"),
+			User:     getEnv("MYSQL_USER", "root"),
+			Password: getEnv("MYSQL_ROOT_PASSWORD", "password"),
+			Name:     getEnv("MYSQL_DATABASE", "pokemon_db"),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "redis"),
