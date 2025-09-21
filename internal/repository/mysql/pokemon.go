@@ -131,38 +131,103 @@ func (r *pokemonRepository) Count(ctx context.Context) (int64, error) {
 }
 
 func (r *pokemonRepository) CreateOrUpdate(ctx context.Context, pokemon *entity.Pokemon) error {
-	existing, err := r.GetByName(ctx, pokemon.Name)
-	if err != nil {
-		return fmt.Errorf("checking existing pokemon: %w", err)
-	}
-
-	if existing != nil {
-		pokemon.ID = existing.ID
-		pokemon.CreatedAt = existing.CreatedAt
-
-		// Delete existing types and abilities first
-		if err := r.db.WithContext(ctx).Where("pokemon_id = ?", pokemon.ID).Delete(&entity.PokemonType{}).Error; err != nil {
-			return fmt.Errorf("deleting existing pokemon types: %w", err)
-		}
-		if err := r.db.WithContext(ctx).Where("pokemon_id = ?", pokemon.ID).Delete(&entity.PokemonAbility{}).Error; err != nil {
-			return fmt.Errorf("deleting existing pokemon abilities: %w", err)
+	// Use transaction to ensure atomicity and idempotency
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		existing, err := r.getByNameInTx(ctx, tx, pokemon.Name)
+		if err != nil {
+			return fmt.Errorf("checking existing pokemon: %w", err)
 		}
 
-		// Update the pokemon with new relationships
-		if err := r.db.WithContext(ctx).Save(pokemon).Error; err != nil {
-			return fmt.Errorf("updating pokemon with relationships: %w", err)
+		if existing != nil {
+			// Check if data actually changed to avoid unnecessary updates
+			if r.isDataUnchanged(existing, pokemon) {
+				log.Printf("⚡ SQL SKIP: Pokemon ID %d (%s) unchanged, skipping update", existing.ID, existing.Name)
+				return nil
+			}
+
+			pokemon.ID = existing.ID
+			pokemon.CreatedAt = existing.CreatedAt
+
+			// Delete existing types and abilities first
+			if err := tx.Where("pokemon_id = ?", pokemon.ID).Delete(&entity.PokemonType{}).Error; err != nil {
+				return fmt.Errorf("deleting existing pokemon types: %w", err)
+			}
+			if err := tx.Where("pokemon_id = ?", pokemon.ID).Delete(&entity.PokemonAbility{}).Error; err != nil {
+				return fmt.Errorf("deleting existing pokemon abilities: %w", err)
+			}
+
+			// Update the pokemon with new relationships
+			if err := tx.Save(pokemon).Error; err != nil {
+				return fmt.Errorf("updating pokemon with relationships: %w", err)
+			}
+
+			log.Printf("✅ SQL UPDATE SUCCESS: Pokemon ID %d (%s) updated with %d types and %d abilities",
+				pokemon.ID, pokemon.Name, len(pokemon.Types), len(pokemon.Abilities))
+			return nil
 		}
 
-		log.Printf("✅ SQL UPDATE SUCCESS: Pokemon ID %d (%s) updated with %d types and %d abilities",
+		// Create new pokemon - use ON CONFLICT for extra safety
+		if err := tx.Create(pokemon).Error; err != nil {
+			return fmt.Errorf("creating pokemon with relationships: %w", err)
+		}
+
+		log.Printf("✅ SQL CREATE SUCCESS: Pokemon ID %d (%s) created with %d types and %d abilities",
 			pokemon.ID, pokemon.Name, len(pokemon.Types), len(pokemon.Abilities))
 		return nil
+	})
+}
+
+// Helper function to get pokemon by name within a transaction
+func (r *pokemonRepository) getByNameInTx(ctx context.Context, tx *gorm.DB, name string) (*entity.Pokemon, error) {
+	var pokemon entity.Pokemon
+	if err := tx.Preload("Types").Preload("Abilities").Where("name = ?", name).First(&pokemon).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("getting pokemon by name in transaction: %w", err)
+	}
+	return &pokemon, nil
+}
+
+// Helper function to check if Pokemon data has actually changed
+func (r *pokemonRepository) isDataUnchanged(existing, new *entity.Pokemon) bool {
+	// Compare basic fields
+	if existing.Height != new.Height ||
+		existing.Weight != new.Weight ||
+		existing.BaseExp != new.BaseExp ||
+		existing.OrderNum != new.OrderNum {
+		return false
 	}
 
-	if err := r.db.WithContext(ctx).Create(pokemon).Error; err != nil {
-		return fmt.Errorf("creating pokemon with relationships: %w", err)
+	// Compare types
+	if len(existing.Types) != len(new.Types) {
+		return false
+	}
+	existingTypes := make(map[string]bool)
+	for _, t := range existing.Types {
+		existingTypes[t.TypeName] = true
+	}
+	for _, t := range new.Types {
+		if !existingTypes[t.TypeName] {
+			return false
+		}
 	}
 
-	log.Printf("✅ SQL CREATE SUCCESS: Pokemon ID %d (%s) created with %d types and %d abilities",
-		pokemon.ID, pokemon.Name, len(pokemon.Types), len(pokemon.Abilities))
-	return nil
+	// Compare abilities
+	if len(existing.Abilities) != len(new.Abilities) {
+		return false
+	}
+	existingAbilities := make(map[string]bool)
+	for _, a := range existing.Abilities {
+		key := fmt.Sprintf("%s_%t", a.AbilityName, a.IsHidden)
+		existingAbilities[key] = true
+	}
+	for _, a := range new.Abilities {
+		key := fmt.Sprintf("%s_%t", a.AbilityName, a.IsHidden)
+		if !existingAbilities[key] {
+			return false
+		}
+	}
+
+	return true
 }
