@@ -1,3 +1,3 @@
 #!/bin/bash
 
-mysql -h mysql -u root -p"${DB_PASSWORD}" < scripts/create_db.sql
+mysql -h 127.0.0.1 -u root -p"${DB_PASSWORD}" < scripts/create_db.sql

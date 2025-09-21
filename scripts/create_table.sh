@@ -7,4 +7,4 @@ read -s -p "Enter database password: " DB_PASSWORD
 echo
 
 echo "Running migrations with user: $DB_USER"
-migrate -path internal/infrastructure/db/mysql/migrations -database "mysql://$DB_USER:$DB_PASSWORD@tcp(mysql:3306)/pokemondb" up
+migrate -path internal/infrastructure/db/mysql/migrations -database "mysql://$DB_USER:$DB_PASSWORD@tcp(127.0.0.1:3306)/pokemondb" up

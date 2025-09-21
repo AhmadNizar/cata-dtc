@@ -56,5 +56,12 @@ The API will be available at `http://localhost:8080`
 - **API**: Port 8080
 - **MySQL**: Port 3306
 - **Redis**: Port 6379
+- **Uptime Kuma**: Port 3001 (monitoring)
 
 All services are automatically configured and accessible within the dev container.
+
+### Important Notes
+
+1. **MySQL Driver Configuration**: When configuring the MySQL driver, ensure `allowPublicKeyRetrieval` is set to `TRUE` for proper connection handling.
+
+2. **Health Monitoring**: Uptime Kuma is configured as a simple monitoring solution with `/api/v1/health` as the health check endpoint for the API service.
